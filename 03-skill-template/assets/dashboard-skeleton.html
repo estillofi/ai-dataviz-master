@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дашборд: заказы</title>
+<style>
+  /* ===== ТОКЕНЫ: единственное место, где живут цвета, шрифты и размеры. Агент подставляет значения из brand-tokens ===== */
+  :root{
+    --bg:#F7F8FA; --surface:#FFFFFF; --ink:#1F2933; --text-body:#3E4C59; --text-muted:#52606D;
+    --grid:#E4E7EB; --axis:#9AA5B1; --border:#D9DEE4;
+    --data-base:#9AA5B1; --data-base-light:#CBD2D9;
+    --accent:#0072B2;            /* единственный акцент */
+    --accent-text:#0072B2;       /* версия акцента для мелкого текста (контраст >= 4.5:1) */
+    --pos:#0072B2; --pos-text:#0072B2;
+    --neg:#D55E00; --neg-text:#B34D00;   /* без пары красный/зелёный */
+    --focus:#0072B2;
+    --radius:10px; --gap:16px;
+    --font:"Source Sans 3",Arial,sans-serif;   /* @font-face и файлы: assets/tokens.css, assets/fonts/ */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text-body);font-family:var(--font)}
+  main{max-width:1100px;margin:0 auto;padding:28px 20px 48px}
+  h1{font-size:26px;line-height:1.2;font-weight:700;color:var(--ink);margin:0 0 6px}
+  .sub{font-size:14px;line-height:1.45;color:var(--text-muted);margin:0 0 18px}
+  .toolbar{display:flex;gap:20px;flex-wrap:wrap;margin:0 0 var(--gap)}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .seg button{font:600 13px var(--font);padding:8px 14px;border:0;background:transparent;color:var(--text-body);cursor:pointer;min-height:36px}
+  .seg button+button{border-left:1px solid var(--border)}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+  button:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--gap);margin-bottom:var(--gap)}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .kpi-l{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted)}
+  .kpi-v{font-size:32px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;margin:4px 0}
+  .kpi-d{font-size:13px;font-weight:600}
+  .kpi-d.up{color:var(--pos-text)} .kpi-d.down{color:var(--neg-text)}
+  .kpi svg{display:block;width:100%;height:36px;margin-top:8px}
+  .grid2{display:grid;grid-template-columns:3fr 2fr;gap:var(--gap)}
+  @media (max-width:800px){.grid2{grid-template-columns:1fr}}
+  .card h2{font-size:15px;line-height:1.3;margin:0 0 2px;color:var(--ink)}
+  .card .cap{font-size:12px;color:var(--text-muted);margin:0 0 10px}
+  .chart{position:relative}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .gl{stroke:var(--grid);stroke-width:1} .ax{stroke:var(--axis);stroke-width:1}
+  .tk{font:11px var(--font);fill:var(--text-muted);font-variant-numeric:tabular-nums}
+  .halo{paint-order:stroke;stroke:var(--surface);stroke-width:4px;stroke-linejoin:round}
+  .ln-base{fill:none;stroke:var(--data-base);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:5 4}
+  .ln-main{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+  .lab{font:600 12px var(--font);fill:var(--text-muted)} .lab.main{fill:var(--accent-text);font-weight:700}
+  .hit{fill:transparent;cursor:crosshair} .hit:focus{outline:none}
+  .hit:focus-visible+.hl,.hit:hover+.hl{opacity:1}
+  .hl{opacity:0;pointer-events:none}
+  .tip{position:absolute;pointer-events:none;background:var(--ink);color:#fff;font:12px/1.4 var(--font);padding:6px 9px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+  .bar-main{fill:var(--accent)} .bar-base{fill:var(--data-base-light)}
+  details{margin-top:10px;font-size:12px;color:var(--text-muted)}
+  table{border-collapse:collapse;margin-top:6px;width:100%}
+  th,td{padding:4px 8px;border-bottom:1px solid var(--grid);text-align:right;font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child{text-align:left}
+  footer{font-size:12px;color:var(--text-muted);margin-top:18px;line-height:1.5}
+  @media (prefers-reduced-motion:no-preference){.seg button{transition:background .15s}}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="h1">Заголовок-вывод считается из данных</h1>
+  <p class="sub">Заказы в месяц, шт. Данные на <span id="asof">30 октября 2026</span>. Переключатели меняют все блоки сразу.</p>
+
+  <div class="toolbar" role="group" aria-label="Фильтры">
+    <div class="seg" id="f-seg" role="group" aria-label="Сегмент"></div>
+    <div class="seg" id="f-per" role="group" aria-label="Период"></div>
+  </div>
+
+  <section class="kpis" id="kpis" aria-label="Ключевые показатели"></section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2 id="t-line">Заказы по месяцам</h2>
+      <p class="cap">Серая пунктирная линия: тот же месяц год назад</p>
+      <div class="chart" id="ch-line"></div>
+      <details><summary>Данные таблицей</summary><table id="tb-line"></table></details>
+    </section>
+    <section class="card">
+      <h2 id="t-bar">Заказы по регионам, сумма за период</h2>
+      <p class="cap">Лидер выделен цветом</p>
+      <div class="chart" id="ch-bar"></div>
+      <details><summary>Данные таблицей</summary><table id="tb-bar"></table></details>
+    </section>
+  </div>
+
+  <footer>Источник: … · Примечание: …</footer>
+</main>
+
+<script>
+/* ===== ДАННЫЕ: заменяются данными пользователя. Всё остальное код не трогает ===== */
+const MONTHS = ["ноя","дек","янв","фев","мар","апр","май","июн","июл","авг","сен","окт"];
+const SEGMENTS = {
+  all: { name: "Все",       orders: [410,420,435,450,470,500,520,545,570,600,640,690], prev: [400,405,410,415,420,425,430,435,440,445,450,455],
+         regions: [["Центр",1560],["Север",980],["Юг",720],["Восток",410]] , conv: 3.4, check: 5200 },
+  a:   { name: "Сегмент A", orders: [250,255,262,270,285,300,315,335,355,380,410,450], prev: [240,243,246,250,253,256,259,262,265,268,271,274],
+         regions: [["Центр",1100],["Север",420],["Юг",260],["Восток",120]], conv: 3.9, check: 6100 },
+  b:   { name: "Сегмент B", orders: [160,165,173,180,185,200,205,210,215,220,230,240], prev: [160,162,164,165,167,169,171,173,175,177,179,181],
+         regions: [["Центр",460],["Север",560],["Юг",460],["Восток",290]], conv: 2.8, check: 4100 }
+};
+const STATE = { seg: "all", per: 12 };
+
+/* ===== помощники ===== */
+const NS = "http://www.w3.org/2000/svg", $ = id => document.getElementById(id);
+const el = (t, a = {}, p) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); p && p.appendChild(n); return n; };
+const fmt = n => Math.round(n).toLocaleString("ru-RU");
+const sum = a => a.reduce((s, v) => s + v, 0);
+const niceScale = (max, ticks = 4) => {              // красивые деления: шаг 1, 2, 2.5, 5 × 10^k
+  if (!(max > 0) || !isFinite(max)) return { step: 1, max: ticks };      // нули, пустые ряды, NaN: безопасная шкала
+  const raw = max / ticks, p = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / p;
+  const step = (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+  return { step, max: Math.ceil(max / step) * step };
+};
+
+/* ===== пустое состояние: понятное сообщение вместо пустого или сломанного графика ===== */
+// ширина SVG = ширина контейнера: текст рисуется 1:1 и не сжимается на телефоне (подписи ≥ 11 px на 375 px)
+const widthOf = (root, fallback) => Math.max(280, Math.round(root.clientWidth || fallback));
+const empty = (root, msg) => { root.innerHTML = `<p class="cap" role="status" style="padding:24px 0;text-align:center">${msg}</p>`; };
+
+/* ===== фильтры ===== */
+function seg(container, items, key) {
+  container.innerHTML = "";
+  items.forEach(([val, label]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(STATE[key] === val));
+    b.onclick = () => { STATE[key] = val; render(); };
+    container.appendChild(b);
+  });
+}
+
+/* ===== KPI-карточка: значение, сравнение (знак + слова, не только цвет), спарклайн ===== */
+function kpi(label, value, deltaPct, deltaText, spark) {
+  const c = document.createElement("div"); c.className = "card kpi";
+  const hasDelta = typeof deltaPct === "number" && isFinite(deltaPct);          // нет базы сравнения: честно так и пишем
+  const up = hasDelta && deltaPct >= 0, arrow = up ? "▲" : "▼", sign = up ? "+" : "−";
+  const dline = hasDelta ? `<div class="kpi-d ${up ? "up" : "down"}">${arrow} ${sign}${Math.abs(deltaPct).toFixed(1).replace(".", ",")}% ${deltaText}</div>`
+                         : `<div class="kpi-d" style="color:var(--text-muted)">нет базы для сравнения</div>`;
+  c.innerHTML = `<div class="kpi-l">${label}</div><div class="kpi-v">${value}</div>${dline}`;
+  if (spark && spark.length > 1) {
+    const s = el("svg", { "data-chart": "sparkline", viewBox: "0 0 200 36", preserveAspectRatio: "none", role: "img", "aria-label": "Динамика за период" });
+    const mn = Math.min(...spark), mx = Math.max(...spark), n = spark.length;       // n >= 2 гарантировано условием выше
+    const pts = spark.map((v, i) => `${(i / (n - 1)) * 200},${34 - ((v - mn) / (mx - mn || 1)) * 30}`).join(" ");
+    el("polyline", { points: pts, fill: "none", stroke: "var(--accent)", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }, s);
+    c.appendChild(s);
+  }
+  return c;
+}
+
+/* ===== линейный график с подсказкой (мышь и клавиатура) ===== */
+function lineChart(root, labels, main, base) {
+  root.innerHTML = "";
+  const n = main.length;
+  if (n === 0) return empty(root, "Нет данных за выбранный период");
+  if (n === 1) return empty(root, `Один месяц данных (${labels[0]}: ${fmt(main[0])}). Для динамики нужно не меньше двух точек`);
+  const W = widthOf(root, 560), H = W < 480 ? 240 : 280, m = { t: 12, r: 92, b: 26, l: 6 };
+  const sc = niceScale(Math.max(...main, ...base)), ymax = sc.max, step = sc.step;
+  const X = i => m.l + i * (W - m.l - m.r) / (n - 1), Y = v => H - m.b - v * (H - m.t - m.b) / ymax;
+  const svg = el("svg", { "data-chart": "line", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-labelledby": "t-line" }, root);
+  for (let v = 0; v <= ymax + 1e-9; v += step) {
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: v === 0 ? "ax" : "gl" }, svg);
+    if (v > 0) { const t = el("text", { x: m.l, y: Y(v) - 4, class: "tk halo" }, svg); t.textContent = fmt(v); }
+  }
+  const every = Math.max(1, Math.ceil(n * 44 / (W - m.l - m.r)));   // подписи месяцев не слипаются на узком экране
+  labels.forEach((l, i) => { if (i % every === 0) { const t = el("text", { x: X(i), y: H - 8, class: "tk", "text-anchor": "middle" }, svg); t.textContent = l; } });
+  const path = a => a.map((v, i) => `${i ? "L" : "M"}${X(i)},${Y(v)}`).join("");
+  el("path", { d: path(base), class: "ln-base" }, svg);
+  el("path", { d: path(main), class: "ln-main" }, svg);
+  const e1 = el("text", { x: W - m.r + 8, y: Y(main[n - 1]) + 4, class: "lab main halo" }, svg); e1.textContent = "Сейчас " + fmt(main[n - 1]);
+  const e2 = el("text", { x: W - m.r + 8, y: Y(base[n - 1]) + 4, class: "lab halo" }, svg); e2.textContent = "Год назад " + fmt(base[n - 1]);
+  const tip = document.createElement("div"); tip.className = "tip"; root.appendChild(tip);
+  const cw = (W - m.l - m.r) / (n - 1);
+  main.forEach((v, i) => {
+    const hit = el("rect", { x: X(i) - cw / 2, y: m.t, width: cw, height: H - m.t - m.b, class: "hit", tabindex: 0, role: "img",
+      "aria-label": `${labels[i]}: ${fmt(v)}, год назад ${fmt(base[i])}` }, svg);
+    const hl = el("circle", { cx: X(i), cy: Y(v), r: 5, fill: "var(--surface)", stroke: "var(--accent)", "stroke-width": 2.5, class: "hl" }, svg);
+    const show = () => { const bb = svg.getBoundingClientRect(), k = bb.width / W;
+      tip.style.display = "block"; tip.style.left = X(i) * k + "px"; tip.style.top = Y(v) * k + "px";
+      tip.textContent = `${labels[i]}: ${fmt(v)} (год назад ${fmt(base[i])})`; };
+    const hide = () => { tip.style.display = "none"; };
+    hit.addEventListener("mouseenter", show); hit.addEventListener("focus", show);
+    hit.addEventListener("mouseleave", hide); hit.addEventListener("blur", hide);
+  });
+}
+
+/* ===== горизонтальные столбцы: сортировка по значению, значения у концов, лидер цветом ===== */
+function barChart(root, rows) {
+  root.innerHTML = "";
+  if (!rows || rows.length === 0) return empty(root, "Нет данных");
+  // сортировка: по значению, при равенстве по названию (детерминированно)
+  const data = [...rows].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "ru")), W = widthOf(root, 380), rowH = 34, m = { t: 4, r: 56, b: 4, l: 70 }, H = m.t + m.b + data.length * rowH;
+  const mx = Math.max(...data.map(d => d[1])) || 1, svg = el("svg", { "data-chart": "bar", "data-axis-min": "0", viewBox: `0 0 ${W} ${H}`, role: "img", "aria-labelledby": "t-bar" }, root);
+  el("line", { x1: m.l, x2: m.l, y1: m.t, y2: H - m.b, class: "ax" }, svg);          // ось от нуля
+  data.forEach(([name, v], i) => {
+    const y = m.t + i * rowH, w = (v / mx) * (W - m.l - m.r);
+    const t = el("text", { x: m.l - 8, y: y + rowH / 2 + 4, class: "lab", "text-anchor": "end" }, svg); t.textContent = name;
+    el("rect", { x: m.l, y: y + 6, width: w, height: rowH - 12, rx: 3, class: i === 0 ? "bar-main" : "bar-base" }, svg);
+    const val = el("text", { x: m.l + w + 6, y: y + rowH / 2 + 4, class: "lab" + (i === 0 ? " main" : "") }, svg); val.textContent = fmt(v);
+  });
+}
+
+/* ===== таблицы данных (доступность, проверка цифр) ===== */
+function table(id, head, rows) {
+  $(id).innerHTML = "<tr>" + head.map(h => `<th>${h}</th>`).join("") + "</tr>" + rows.map(r => "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>").join("");
+}
+
+/* ===== главный рендер: всё из STATE и DATA ===== */
+function render() {
+  seg($("f-seg"), Object.entries(SEGMENTS).map(([k, s]) => [k, s.name]), "seg");
+  seg($("f-per"), [[6, "6 месяцев"], [12, "12 месяцев"]], "per");
+  const s = SEGMENTS[STATE.seg], n = STATE.per, off = MONTHS.length - n;
+  const labels = MONTHS.slice(off), main = s.orders.slice(off), base = s.prev.slice(off);
+  const tot = sum(main), totPrev = sum(base), d = totPrev > 0 ? (tot / totPrev - 1) * 100 : null;
+  const k = $("kpis"); k.innerHTML = "";
+  k.appendChild(kpi("Заказы за период", fmt(tot), d, "к прошлому году", main));
+  k.appendChild(kpi("Конверсия", s.conv.toFixed(1).replace(".", ",") + "%", 4.6, "к прошлому периоду", null));
+  k.appendChild(kpi("Средний чек, ₽", fmt(s.check), -1.8, "к прошлому периоду", null));
+  // заголовок = вывод, посчитанный из данных (не выдуманный): направление, величина, лидер
+  const top = [...s.regions].sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "ru"))[0];
+  $("h1").textContent = main.length === 0 ? "Нет данных за выбранный период"
+    : d === null ? `Заказы за период: ${fmt(tot)}${top && top[1] > 0 ? `, лидирует регион ${top[0]}` : ""} (нет базы для сравнения)`
+    : `Заказы ${d >= 0 ? "выросли" : "снизились"} на ${Math.abs(d).toFixed(0)}% к прошлому году${top && top[1] > 0 ? `, лидирует регион ${top[0]}` : ""}`;
+  lineChart($("ch-line"), labels, main, base);
+  barChart($("ch-bar"), s.regions);
+  table("tb-line", ["Месяц", "Заказы", "Год назад"], labels.map((l, i) => [l, fmt(main[i]), fmt(base[i])]));
+  table("tb-bar", ["Регион", "Заказы"], [...s.regions].sort((a, b) => b[1] - a[1]).map(r => [r[0], fmt(r[1])]));
+}
+render();
+// перерисовать при смене ширины (поворот телефона, масштаб): размеры текста остаются читаемыми
+let lastW = document.documentElement.clientWidth, rt;
+addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => {
+  const w = document.documentElement.clientWidth; if (w !== lastW) { lastW = w; render(); } }, 150); });
+</script>
+</body>
+</html>

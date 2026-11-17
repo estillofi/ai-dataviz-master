@@ -1,0 +1,14 @@
+{
+  "brand": "Redline Logistics (вымышленный)",
+  "colors": {
+    "primary_red": "#E30613",
+    "secondary_green": "#2ECC71",
+    "highlight_yellow": "#FFD60A",
+    "light_gray_text": "#A0A0A0",
+    "bg": "#FFFFFF"
+  },
+  "fonts": {
+    "headline": "Redline Display (платный, лицензии на устройствах читателей нет)",
+    "text": "Arial"
+  }
+}

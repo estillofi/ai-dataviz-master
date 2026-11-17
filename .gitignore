@@ -1,0 +1,17 @@
+# Приватные материалы владельца и результаты работы агента: не коммитить в публичный репозиторий
+01-brand-inputs/assets/*
+!01-brand-inputs/assets/.gitkeep
+04-output/*
+!04-output/README.md
+05-research-log/*
+!05-research-log/README.md
+00-session/state.md
+
+# Сырые логи прогонов агентов: локальные пути и кэш машины; в репозитории только отчёты *.md
+tests/reports/*/
+
+# Сборка
+dist/
+__pycache__/
+*.pyc
+.DS_Store

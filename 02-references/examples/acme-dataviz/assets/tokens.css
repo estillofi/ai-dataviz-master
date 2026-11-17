@@ -1,0 +1,13 @@
+/* Токены Acme. Единственное место, где живут цвета, шрифты и размеры. */
+:root {
+  --bg: #F7F8FA;  --surface: #FFFFFF;
+  --ink: #1B2A41;  --text-body: #3A4A63;  --text-muted: #566277;
+  --grid: #E4E7EB;  --axis: #9AA5B1;  --border: #D9DEE4;
+  --data-base: #7B8794;  --data-base-light: #CBD2D9;
+  --accent: #C2620A;  --accent-text: #B34D00;
+  --cat-1: #2457C5;  --cat-2: #C2620A;  --cat-3: #1B8A6B;  --cat-4: #8E5BB5;  --cat-5: #566277;
+  --pos: #2457C5;  --pos-text: #2457C5;  --neg: #C2620A;  --neg-text: #B34D00;
+  --focus: #2457C5;
+  --radius: 10px;  --gap: 16px;
+  --font: "Inter", -apple-system, "Segoe UI", Arial, sans-serif;
+}

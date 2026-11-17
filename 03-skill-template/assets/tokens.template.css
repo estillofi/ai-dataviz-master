@@ -1,0 +1,22 @@
+/* Токены {{КОМАНДА}}. Единственное место, где живут цвета, шрифты и размеры. */
+:root {
+  /* поверхности */
+  --bg: {{}};  --surface: {{}};
+  /* текст */
+  --ink: {{}};  --text-body: {{}};  --text-muted: {{}};   /* >= 4.5:1 на --bg */
+  /* структура */
+  --grid: {{}};  --axis: {{}};  --border: {{}};
+  /* данные */
+  --data-base: {{}};  --data-base-light: {{}};
+  --accent: {{}};  --accent-text: {{}};                   /* accent: >= 3:1; accent-text: >= 4.5:1 */
+  --cat-1: {{}};  --cat-2: {{}};  --cat-3: {{}};  --cat-4: {{}};  --cat-5: {{}};  --cat-6: {{}};
+  --pos: {{}};  --pos-text: {{}};  --neg: {{}};  --neg-text: {{}};
+  --focus: {{}};
+  /* форма и шрифты */
+  --radius: {{}};  --gap: 16px;
+  --font-display: {{}};
+  --font-body: {{}};
+  --font: var(--font-body);
+}
+
+/* Добавь @font-face для выбранных локальных файлов: см. 02-references/fonts/README.md. */
