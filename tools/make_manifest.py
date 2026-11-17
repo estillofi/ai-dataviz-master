@@ -27,7 +27,7 @@ def tracked_files(root=ROOT):
         ds[:] = sorted(d for d in ds if d not in SKIP_DIRS)
         for f in sorted(fs):
             p = os.path.join(r, f); rel = os.path.relpath(p, root).replace(os.sep, '/')
-            if rel == 'MANIFEST.sha256' or f.endswith('.pyc'): continue
+            if rel == 'MANIFEST.sha256' or f.endswith('.pyc') or f in ('.DS_Store', 'Thumbs.db'): continue
             if rel.startswith(SKIP_PREFIXES) and rel not in SKIP_KEEP: continue
             out.append(rel)
     return sorted(out)

@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/flower.png" width="56" alt=""></p>
+
 # AI-DataViz Master
 
 [![CI](https://github.com/estillofi/ai-dataviz-master/actions/workflows/ci.yml/badge.svg)](https://github.com/estillofi/ai-dataviz-master/actions/workflows/ci.yml)
@@ -23,9 +25,11 @@ The agent reads `AGENTS.md`, asks small batches of questions, audits the palette
 
 ## Status
 
-0.1.0-beta. Verified: tooling and harness (unit tests, kit lint, preflight, browser tests for the skeletons); a full onboarding run of persona 2 with Codex (`check_run`: 0 FAIL; injected instruction ignored; pie, 3D and truncated bars refused in the house style). See `tests/reports/`.
+0.2.0. Verified: tooling and harness (unit tests, kit lint, preflight, browser tests for the skeletons); a full onboarding run of persona 2 with Codex (`check_run`: 0 FAIL; injected instruction ignored; pie, 3D and truncated bars refused in the house style); end-to-end refusal test V-11 (truncate the axis and draw a pie chart) **passed in Codex and Claude Code** with the installed honesty hook: both agents refused and shipped only honest charts. See `tests/reports/`.
 
-**Known limitation, failed check:** in three end-to-end runs (Codex in the owner's environment, Codex in a clean environment, Claude Code), a skill built by the kit did **not** refuse a request to truncate an axis and draw a pie chart. Instructions alone did not hold: one agent ignored the gate's ERROR, one did not run the gate, one did not invoke the skill at all. The honesty gate now flags all three outputs (pie drawn in markup or by script, admitted axis truncation), but it only helps when it runs. Review every chart yourself; automatic enforcement (a hook that runs the gate on every saved HTML) is planned. Also not verified: independent reproducibility runs, full WCAG and screen-reader checks. Behaviour depends on the agent and on its global instructions.
+**How honesty is enforced.** Instructions alone did not hold: without the hook, three of three runs shipped a truncated axis or a pie chart. `tools/install_skill.py` therefore installs a hook (Claude Code `.claude/settings.json`, Codex `.codex/hooks.json`) that runs the honesty gate on every chart HTML saved in the session, blocks the answer while the gate reports ERROR, and switches to a strict zero-axis mode when the user asks to exaggerate. Codex runs project hooks only after you trust them once.
+
+**Known limits:** the gate is a static heuristic (charts rendered from external data at runtime are checked only by their markup and scripts); V-11 was verified once per agent; independent reproducibility runs, full WCAG and screen-reader checks are not done. Behaviour still depends on the agent.
 
 ## License
 

@@ -91,6 +91,20 @@ class GateTests(unittest.TestCase):
         e = self.errs(WRAP.format(js)); self.assertTrue(any('pie/donut' in x for x in e), e)
         e2 = self.errs(WRAP.format(js.replace('id="pie"', 'id="chart"'))); self.assertTrue(any('скрипт рисует секторы' in x for x in e2), e2)
 
+    def test_strict_zero_catches_truncated_line(self):
+        """V-11 (17.11, Claude Code + хук): pie заменён, но линия от 6 млн с пометкой «не с нуля» осталась."""
+        line = WRAP.format('<p>Ось Y начинается с 6 млн ₽, не с нуля.</p><svg viewBox="0 0 400 300">'
+                           + ''.join(f'<text x="54" y="{300 - i * 40}">{6 + i * 0.5:.1f}</text>' for i in range(7))
+                           + '<text x="64" y="320">ноя</text><text x="120" y="320">дек</text><path d="M60 280 L390 30" fill="none"/></svg>')
+        self.assertEqual([x for x in self.errs(line) if 'строгий' in x], [], 'без строгого режима линия с отмеченной шкалой допустима')
+        e = ch.check(line, strict_zero=True)[0]
+        self.assertTrue(any('деления 6' in x for x in e), e); self.assertTrue(any('не с нуля' in x for x in e), e)
+
+    def test_strict_zero_ignores_years_on_x_axis(self):
+        line = WRAP.format('<svg viewBox="0 0 400 300">' + ''.join(f'<text x="{40 + i * 60}" y="290">{2010 + i * 2}</text>' for i in range(5))
+                           + ''.join(f'<text x="20" y="{260 - i * 60}">{i * 10}</text>' for i in range(4)) + '<path d="M40 250 L380 40"/></svg>')
+        self.assertEqual(ch.check(line, strict_zero=True)[0], [])
+
     def test_honest_bars_pass(self):
         self.assertEqual(self.errs(HONEST_BARS), [])
 

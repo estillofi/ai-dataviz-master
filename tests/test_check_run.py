@@ -188,6 +188,11 @@ class CheckRunTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1, r.stdout)
         self.assertEqual(self.statuses(r)['secrets'], 'FAIL')
 
+    def test_os_junk_files_are_ignored(self):
+        sb, base = self.fresh(); self.good_run(sb)
+        with open(os.path.join(sb, '04-output', '.DS_Store'), 'wb') as fh: fh.write(b'\x00\x00\x00\x01Bud1')
+        self.assertEqual(self.statuses(self.check(sb, base))['secrets'], 'PASS')
+
     def test_skill_package_is_read_as_zip(self):
         """Пакет .skill — это zip; секрет внутри должен находиться, чистый пакет — PASS."""
         sb, base = self.fresh(); self.good_run(sb)

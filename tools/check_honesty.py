@@ -24,7 +24,10 @@
 ВАЖНО: это эвристика. ERROR означает «почти наверняка нарушение». Отсутствие ошибок НЕ доказывает честность графика:
 тест из 10 вопросов (core/01-integrity-and-perception.md) всё равно обязателен.
 
-Запуск:  python3 tools/check_honesty.py результат.html [ещё.html …] [--allow-complex] [--allow-pie]
+Строгий режим --strict-zero (его включает хук, если пользователь просил обрезать ось): ось значений не от нуля — ERROR
+для любого графика, включая линию; «не с нуля» в тексте тоже ERROR.
+
+Запуск:  python3 tools/check_honesty.py результат.html [ещё.html …] [--allow-complex] [--allow-pie] [--strict-zero]
          --allow-pie только если исключение R6 записано владельцем в house-style.md.
 Код возврата: 0 нет ERROR; 1 есть ERROR; 2 неверный ввод.
 """
@@ -64,7 +67,24 @@ ADMITTED = re.compile(
     r'|\b(?:рост|разниц\w*|изменени\w*|падени\w*)\s+(?:визуально\s+)?выгляд\w*\s+(?:сильнее|больше|круче|внушительнее|заметнее)'
     r'|\bвизуально\s+преувеличива\w*', re.I)
 
-def check(html, allow_complex=False, allow_pie=False):
+# Строгий режим (--strict-zero): включается, когда пользователь сам просил обрезать ось или «чтобы рост выглядел больше».
+# Тогда ось значений не от нуля — ошибка для любого графика, включая линию (обычно у линии ненулевая шкала допустима).
+STRICT_ADMIT = re.compile(r'\bне\s+(?:с|от)\s+нуля\b|\bос[ьи]\s+(?:\w+\s+){0,2}начина\w*\s+(?:с|от)\s+[1-9]|\bnot\s+(?:start(?:ing)?\s+)?(?:at|from)\s+zero\b', re.I)
+
+def value_axis_without_zero(svg):
+    """Деления оси значений: числа в <text> с одинаковой координатой x (столбик подписей сбоку). Ряд без нуля -> список, иначе None."""
+    groups = {}
+    for tag, t in re.findall(r'(<text\b[^>]*>)(.*?)</text>', svg, flags=re.S):
+        x = attr(tag, 'x')
+        t = re.sub(r'<[^>]+>', '', t).strip()
+        m = re.match(r'^(' + NUM + r')\s*(?:[%₽$€]|тыс\.?|млн\.?|млрд\.?|k|m|b|ед\.?|шт\.?)?$', t, re.I)
+        if x is not None and m and to_num(m.group(1)) is not None: groups.setdefault(x, []).append(to_num(m.group(1)))
+    for nums in groups.values():
+        run = arithmetic_run(nums) if len(nums) >= 3 else None
+        if run and min(run) > 0 and 0 not in nums: return run
+    return None
+
+def check(html, allow_complex=False, allow_pie=False, strict_zero=False):
     errors, warns = [], []
     body = re.sub(r'<!--.*?-->', '', html, flags=re.S)
     css = ' '.join(re.findall(r'<style[^>]*>(.*?)</style>', body, flags=re.S | re.I)) + ' ' + ' '.join(re.findall(r'style\s*=\s*"([^"]*)"', body))
@@ -131,6 +151,15 @@ def check(html, allow_complex=False, allow_pie=False):
     if has_chart:
         hits = sorted({m.group(0).strip() for m in ADMITTED.finditer(text)})
         if hits: errors.append("текст признаёт искажение графика: «" + "», «".join(hits[:3]) + "». Предупреждение не делает график честным: перерисуй честно (ось от нуля или изменение как dumbbell / индекс к базе) и убери оговорку")
+    if strict_zero and has_chart:
+        for svg in svgs:
+            run = value_axis_without_zero(svg)
+            if run:
+                errors.append(f"строгий режим (просили усечь ось): ось значений не от нуля, деления {', '.join(('%g' % x) for x in run[:5])}… "
+                              "Для любого графика, включая линию, нужна шкала от нуля; рост покажи подписью или индексом к базе")
+                break
+        hits = sorted({m.group(0).strip() for m in STRICT_ADMIT.finditer(text)})
+        if hits: errors.append("строгий режим (просили усечь ось): на странице сказано «" + "», «".join(hits[:3]) + "». Шкала должна начинаться с нуля")
     if undeclared: warns.append(f"{undeclared} график(ов) без объявления типа (data-chart): шлюз проверил их только эвристикой")
     if re.search(r'втор(ая|ой|ую)\s+ос[ьи]|правая\s+ось|second(ary)?\s+(y[- ]?)?axis|dual[- ]axis', text, re.I):
         errors.append("в подписях упомянута вторая ось: R4, без исключений")
@@ -143,6 +172,7 @@ def check(html, allow_complex=False, allow_pie=False):
 def main():
     ap = argparse.ArgumentParser(description="Шлюз честности для готового HTML")
     ap.add_argument('files', nargs='+'); ap.add_argument('--allow-complex', action='store_true'); ap.add_argument('--allow-pie', action='store_true')
+    ap.add_argument('--strict-zero', action='store_true', help="ось от нуля для любых графиков (когда просили усечь ось)")
     a = ap.parse_args()
     total = 0
     for f in a.files:
@@ -150,7 +180,7 @@ def main():
             with open(f, encoding='utf-8') as fh: html = fh.read()
         except (OSError, UnicodeError) as e:
             print(f"Ошибка: не прочитан {f}: {e}", file=sys.stderr); return 2
-        errors, warns = check(html, a.allow_complex, a.allow_pie)
+        errors, warns = check(html, a.allow_complex, a.allow_pie, a.strict_zero)
         print(f"== {f}")
         for w in warns: print(f"  WARN  {w}")
         for e in errors: print(f"  ERROR {e}")

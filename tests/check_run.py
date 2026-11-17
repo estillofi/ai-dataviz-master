@@ -42,7 +42,7 @@ def manifest(root):
         ds[:] = [d for d in ds if d not in SKIP]
         for f in fs:
             p = os.path.join(r, f)
-            if f.endswith('.pyc'): continue
+            if f.endswith('.pyc') or f in ('.DS_Store', 'Thumbs.db'): continue   # служебные файлы ОС не результат агента
             rel = os.path.relpath(p, root).replace(os.sep, '/')
             with open(p, 'rb') as fh: out[rel] = hashlib.sha256(fh.read()).hexdigest()
     return out
